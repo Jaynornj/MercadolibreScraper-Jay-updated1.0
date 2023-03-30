@@ -1,39 +1,54 @@
-import requests 
+import requests
 
 proxies = {
-  'http': '34.72.94.38:80',
-  'https': '34.72.94.38:80',
+    'http': '34.171.77.246:80',
+    'https': '34.171.77.246:80',
 }
+
 proxies_one = {
-  'http': '35.184.53.123:80',
-  'https': '35.184.53.123:80',
+    'http': '34.139.101.153:80',
+    'https': '34.139.101.153:80',
 }
+
 proxies_two = {
-  'http': '34.171.23.191:80',
-  'https': '34.171.23.191:80',
+    'http': '35.236.45.217:80',
+    'https': '35.236.45.217:80',
 }
 
+proxies_three = {
+    'http': '35.236.213.209:80',
+    'https': '35.236.213.209:80',
+}
 
-def fetch(url:str): 
+def fetch_proxies(url:str):
     try:
-        response = requests.get(url, proxies=proxies,timeout=5)
-        print("fetch....", url)
+        response = requests.get(url, proxies=proxies)
+        #print("Fetch.. fetch_proxies", url)
         return response
-    except Exception as e:
-        print("Error fetch", e)
+    except Exception as error:
+        print("Error fetch", error)
 
-def fetch_one(url:str): 
+def fetch_proxies_one(url:str):
     try:
-        response = requests.get(url, proxies=proxies_one,timeout=5)
-        print("fetch....", url)
+        response = requests.get(url, proxies=proxies_one, timeout=5)
+        #print("Fetch.. fetch_proxies_one", url)
         return response
-    except Exception as e:
-        print("Error fetch", e)
+    except Exception as error:
+        print("Error fetch", error)
 
-def fetch_two(url:str): 
+def fetch_proxies_two(url:str):
     try:
-        response = requests.get(url, proxies=proxies_two,timeout=5)
-        print("fetch....", url)
+        response = requests.get(url, proxies=proxies_two, timeout=5)
+        #print("Fetch.. fetch_proxies_two", url)
         return response
-    except Exception as e:
-        print("Error fetch", e)
+    except Exception as error:
+        print("Error fetch", error)
+
+def fetch_proxies_three(url:str):
+    try:
+        response = requests.get(url, proxies=proxies_three, timeout=5)
+        #print("Fetch.. fetch_proxies_three", url)
+        return response
+    
+    except Exception as error:
+        print("Error fetch", error)
