@@ -1,6 +1,0 @@
-beautifulsoup4
-requests
-pandas
-openpyxl
-requests_ip_rotator
-bs4
