@@ -3,10 +3,11 @@ from bs4 import BeautifulSoup
 import requests
 import concurrent.futures
 import pandas as pd
+import datetime
 
 NUM_THREADS = 10
 
-custId = '176165485'
+custId = '89193573'
 CategoriesWithSub = []
 CategoriesWithOutSub = []
 products_data = []
@@ -28,6 +29,7 @@ def getMoreCategory(link):
     except:
         print("No more subcategories")
 
+
 def getTotalSold(name):
     try:
         response = fetch_proxies(f'https://www.mercadolibre.com.co/perfil/{name}')
@@ -44,6 +46,7 @@ def getTotalSold(name):
 
     except:
         print("Error on looking info")
+
 
 def getLinkByCategory(pageSoup:BeautifulSoup):
 
@@ -157,20 +160,34 @@ def get_id(url:str) -> str:
         product_id = product_id[0]
     return product_id
 
+
+
+def get_description(url):
+    try:
+        alex = fetch_proxies(url)
+        print(alex.status_code)
+    except Exception as e:
+        print(e)
+
+
 def getInformationOlList(soup: BeautifulSoup):
     try:
         section = soup.find('section', {'class': 'ui-search-results ui-search-results--without-disclaimer shops__search-results'})
         rawItemList = section.find_all('li', {'class': 'ui-search-layout__item'})
 
         for item in rawItemList:
-            products_data.append({
-                'titles': item.find('h2', {'class': 'ui-search-item__title'}).text,
-                'prices': item.find('span', {'class': 'price-tag-fraction'}).text.replace(',', ''),
-                'urls': item.find('a', {'class': 'ui-search-link'})['href'],
-                'id_product': get_id(item.find('a', {'class': 'ui-search-item__group__element'})['href'])
-            })
-            #a = item.find('a', {'class': 'ui-search-item__group__element'})['href']
-            #get_description(a)
+            try:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=NUM_THREADS) as executor:
+                    executor.submit(
+                        products_data.append({
+                            'titles': item.find('h2', {'class': 'ui-search-item__title'}).text,
+                            'prices': item.find('span', {'class': 'price-tag-fraction'}).text.replace(',', ''),
+                            'urls': item.find('a', {'class': 'ui-search-item__group__element'})['href'],
+                            'id_product': get_id(item.find('a', {'class': 'ui-search-item__group__element'})['href'])
+                            })
+                        )
+            except Exception as r:
+                print(r)
 
     except Exception as e:
         print("Error get element Ol", e)
@@ -180,21 +197,25 @@ def getInformation(soup: BeautifulSoup) -> None:
         rawItemList = soup.find_all('li', {'class': 'ui-search-layout__item'})
 
         for item in rawItemList:
-            products_data.append({
-                'titles': item.find('h2', {'class': 'ui-search-item__title'}).text,
-                'prices': item.find('span', {'class': 'price-tag-fraction'}).text.replace(',', ''),
-                'urls': item.find('a', {'class': 'ui-search-item__group__element'})['href'],
-                'id_product': get_id(item.find('a', {'class': 'ui-search-item__group__element'})['href'])
-            })
-
-            #a = item.find("a", class_="ui-search-link")["href"]
-            #get_description(a)
-            
+            try:
+                with concurrent.futures.ThreadPoolExecutor(max_workers=NUM_THREADS) as executor:
+                    executor.submit(
+                        products_data.append({
+                            'titles': item.find('h2', {'class': 'ui-search-item__title'}).text,
+                            'prices': item.find('span', {'class': 'price-tag-fraction'}).text.replace(',', ''),
+                            'urls': item.find('a', {'class': 'ui-search-item__group__element'})['href'],
+                            'id_product': get_id(item.find('a', {'class': 'ui-search-item__group__element'})['href'])
+                            })
+                        )
+                
+            except Exception as r:
+                print(r)
     except:
         getInformationOlList(soup)
         print("Error to get information")
 
 def pagination(nextPage, isNextPage, isFirstPage, soup): 
+
     if not nextPage:
         return
     if isFirstPage == '1':
@@ -244,7 +265,26 @@ def searchItems(link):
     except:
         print("Error to get items")
 
+
+def get_sold(product):
+    try:
+        res = fetch_proxies(product['urls'])
+        if not res:
+            res = fetch_proxies_one(product['urls'])
+            if not res:
+                res = fetch_proxies_two(product['urls'])
+                if not res:
+                    res = fetch_proxies_three(product['urls'])
+
+        ItemSoup = BeautifulSoup(res.content, 'html.parser')
+        countSold = ItemSoup.find('span', {'class': 'ui-pdp-subtitle'}).text
+        product['sold'] = countSold[10:]
+    except:
+        print("Error to get sold by product")
+
 def main():
+    y = datetime.datetime.now()
+    print(y)
     print("Start scraping... please wait...")
     response = fetch_proxies('https://listado.mercadolibre.com.co/_CustId_'+custId)
     soup = BeautifulSoup(response.content, 'html.parser')
@@ -255,7 +295,6 @@ def main():
     
     with concurrent.futures.ThreadPoolExecutor(max_workers=NUM_THREADS) as executor:
             executor.map(searchItems, CategoriesWithOutSub)
-
     products_data.sort(reverse=True, key=lambda x:(len(x), repr(x)))
     
     for i in range(0, len(products_data)):
@@ -265,8 +304,18 @@ def main():
         except:
             continue
 
+    if len(products_data) % 5000 == 0:
+        time_queries = int(len(products_data) / 5000)
+    else:
+        time_queries = int((len(products_data) // 5000) + 1)
+    
+    for i in range(0, time_queries):
+        with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
+                executor.map(get_sold, products_data[0:4999])
+    
     frame = pd.DataFrame(products_data)
     frame.to_excel(f'{name_seler}.xlsx', index=False)
-
+    x = datetime.datetime.now()
+    print(x)
 if __name__ == '__main__':
     main()
