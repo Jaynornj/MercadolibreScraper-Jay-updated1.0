@@ -7,7 +7,7 @@ import datetime
 
 NUM_THREADS = 10
 
-custId = '89193573'
+custId = '176165485'
 CategoriesWithSub = []
 CategoriesWithOutSub = []
 products_data = []
@@ -29,7 +29,6 @@ def getMoreCategory(link):
     except:
         print("No more subcategories")
 
-
 def getTotalSold(name):
     try:
         response = fetch_proxies(f'https://www.mercadolibre.com.co/perfil/{name}')
@@ -46,7 +45,6 @@ def getTotalSold(name):
 
     except:
         print("Error on looking info")
-
 
 def getLinkByCategory(pageSoup:BeautifulSoup):
 
@@ -160,16 +158,6 @@ def get_id(url:str) -> str:
         product_id = product_id[0]
     return product_id
 
-
-
-def get_description(url):
-    try:
-        alex = fetch_proxies(url)
-        print(alex.status_code)
-    except Exception as e:
-        print(e)
-
-
 def getInformationOlList(soup: BeautifulSoup):
     try:
         section = soup.find('section', {'class': 'ui-search-results ui-search-results--without-disclaimer shops__search-results'})
@@ -183,7 +171,8 @@ def getInformationOlList(soup: BeautifulSoup):
                             'titles': item.find('h2', {'class': 'ui-search-item__title'}).text,
                             'prices': item.find('span', {'class': 'price-tag-fraction'}).text.replace(',', ''),
                             'urls': item.find('a', {'class': 'ui-search-item__group__element'})['href'],
-                            'id_product': get_id(item.find('a', {'class': 'ui-search-item__group__element'})['href'])
+                            'id_product': get_id(item.find('a', {'class': 'ui-search-item__group__element'})['href']),
+                            'main_image': item.find('img', {'class': 'ui-search-result-image__element'})["data-src"]
                             })
                         )
             except Exception as r:
@@ -204,7 +193,8 @@ def getInformation(soup: BeautifulSoup) -> None:
                             'titles': item.find('h2', {'class': 'ui-search-item__title'}).text,
                             'prices': item.find('span', {'class': 'price-tag-fraction'}).text.replace(',', ''),
                             'urls': item.find('a', {'class': 'ui-search-item__group__element'})['href'],
-                            'id_product': get_id(item.find('a', {'class': 'ui-search-item__group__element'})['href'])
+                            'id_product': get_id(item.find('a', {'class': 'ui-search-item__group__element'})['href']),
+                            'main_image': item.find('img', {'class': 'ui-search-result-image__element'})["data-src"]
                             })
                         )
                 
@@ -265,8 +255,7 @@ def searchItems(link):
     except:
         print("Error to get items")
 
-
-def get_sold(product):
+def get_info(product):
     try:
         res = fetch_proxies(product['urls'])
         if not res:
@@ -277,44 +266,86 @@ def get_sold(product):
                     res = fetch_proxies_three(product['urls'])
 
         ItemSoup = BeautifulSoup(res.content, 'html.parser')
-        countSold = ItemSoup.find('span', {'class': 'ui-pdp-subtitle'}).text
-        product['sold'] = countSold[10:]
-    except:
-        print("Error to get sold by product")
+        try:
+            countSold = ItemSoup.find('span', {'class': 'ui-pdp-subtitle'}).text
+            product['sold'] = countSold[10:]
+        except:
+            pass
+        
+        try:
+            descriptionContent = ItemSoup.find('p', {'class': 'ui-pdp-description__content'})
+            description = descriptionContent.get_text()
+
+            if len(description) >= 100:
+                product['description'] = description[:99]
+            else:
+                product['description'] = description
+        except:
+            pass
+        
+        try:
+            imagesContent = ItemSoup.find_all('div', {'class': 'ui-pdp-thumbnail__picture'})
+            
+            for item in imagesContent:
+                images = item.find('img', {'class': 'ui-pdp-image'})
+                desc = ''
+                for num in images['alt']:
+                    images = item.find('img', {'class': 'ui-pdp-image'})
+                    desc += num
+
+                    first = images['data-src']
+                    if desc == 'Imagen 1':
+                        pass
+                    if desc == 'Imagen 2':
+                        product['second_image'] = first
+                    if desc == 'Imagen 3':
+                        product['third_image'] = first
+        except:
+            pass
+                
+    except Exception as e:
+        pass
+
 
 def main():
     y = datetime.datetime.now()
     print(y)
     print("Start scraping... please wait...")
-    response = fetch_proxies('https://listado.mercadolibre.com.co/_CustId_'+custId)
-    soup = BeautifulSoup(response.content, 'html.parser')
-    name_seler = soup.find('h1', {'class': 'ui-search-breadcrumb__title'}).text[17::].replace(' ', '+')
+    try:
+        response = fetch_proxies('https://listado.mercadolibre.com.co/_CustId_'+custId)
 
-    getLinkByCategory(soup)
-    getTotalSold(name_seler)
-    
-    with concurrent.futures.ThreadPoolExecutor(max_workers=NUM_THREADS) as executor:
-            executor.map(searchItems, CategoriesWithOutSub)
-    products_data.sort(reverse=True, key=lambda x:(len(x), repr(x)))
-    
-    for i in range(0, len(products_data)):
-        try:
-            if products_data[i+1]['id_product'] == products_data[i]['id_product']:
-                    products_data.remove(products_data[i])
-        except:
-            continue
+        soup = BeautifulSoup(response.content, 'html.parser')
+        name_seler = soup.find('h1', {'class': 'ui-search-breadcrumb__title'}).text[17::].replace(' ', '+')
 
-    if len(products_data) % 5000 == 0:
-        time_queries = int(len(products_data) / 5000)
-    else:
-        time_queries = int((len(products_data) // 5000) + 1)
-    
-    for i in range(0, time_queries):
-        with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
-                executor.map(get_sold, products_data[0:4999])
-    
-    frame = pd.DataFrame(products_data)
-    frame.to_excel(f'{name_seler}.xlsx', index=False)
+        getLinkByCategory(soup)
+        getTotalSold(name_seler)
+        
+        with concurrent.futures.ThreadPoolExecutor(max_workers=NUM_THREADS) as executor:
+                executor.map(searchItems, CategoriesWithOutSub)
+        products_data.sort(reverse=True, key=lambda x:(len(x), repr(x)))
+        
+        for i in range(0, len(products_data)):
+            try:
+                if products_data[i+1]['id_product'] == products_data[i]['id_product']:
+                        products_data.remove(products_data[i])
+            except:
+                continue
+
+        if len(products_data) % 5000 == 0:
+            time_queries = int(len(products_data) / 5000)
+        else:
+            time_queries = int((len(products_data) // 5000) + 1)
+        
+        for i in range(0, time_queries):
+            with concurrent.futures.ThreadPoolExecutor(max_workers=30) as executor:
+                    executor.map(get_info, products_data[0:4999])
+        
+        frame = pd.DataFrame(products_data)
+        frame.to_excel(f'{name_seler}.xlsx', index=False)
+
+    except Exception as E:
+        print(E)
+
     x = datetime.datetime.now()
     print(x)
 if __name__ == '__main__':
